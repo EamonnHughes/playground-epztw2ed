@@ -8,7 +8,6 @@ import scala.io.StdIn
 
 object Adventure extends App {
 
-  // Some Types
 
   type Actions = PartialFunction[List[String], Unit]
 
@@ -20,21 +19,17 @@ object Adventure extends App {
     def actions: Actions
   }
 
-  // Some Variables
 
   var place: Place = Shire
   var inventory: Set[String] = Set.empty
   var going: Boolean = true
 
-  // Some Things
 
   def Ring = "Ring"
 
   def Banana = "Banana"
 
   def Boat = "Boat"
-
-  // Some Places
 
   case object Shire extends Place {
     things = things + Ring
