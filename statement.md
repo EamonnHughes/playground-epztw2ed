@@ -1,442 +1,282 @@
 
-import processing.core.PConstants.MAX_INT
-import processing.core._
-import processing.event.KeyEvent
+
+
+import sun.management.snmp.jvmmib.JvmRTBootClassPathEntryMBean
+
 import scala.io.StdIn
-import scala.util.Random
 
-class RPG1 extends PApplet {
 
-  import RPG1._
+object Adventure extends App {
 
-  var weapons = List.empty[Weapon]
-  var enemies = List.empty[Enemy]
-  var walls = List.empty[Wall]
+  // Some Types
 
-  override def setup(): Unit = {
-    characterShape = loadImage("mage.png")//loadShape("character.svg")
-    targetShape = loadImage("orc.png")
+  type Actions = PartialFunction[List[String], Unit]
+
+  trait Place {
+    var things: Set[String] = Set.empty
+
+    def describe(): Unit
+
+    def actions: Actions
   }
 
+  // Some Variables
 
-  override def settings(): Unit = {
-    size(1600, 1000)
-  }
+  var place: Place = Shire
+  var inventory: Set[String] = Set.empty
+  var going: Boolean = true
 
-  var lives = 100
-  var xp = 0
-  var level = 1
-  var strength = 1
-  var speed = 1
-  var will = 1
+  // Some Things
 
-  var character = Character(
-    x = 100.0,
-    y = 100.0,
-    dx = speed,
-    dy = speed,
-    angle = 0.0,
-    rad = 100.0
-  )
+  def Ring = "Ring"
 
-  var MaxAge = 500
-  var dronetime = System.currentTimeMillis()
+  def Banana = "Banana"
 
-  val PlayingState = 0
-  val InventoryState = 1
-  val CharacterState = 2
+  def Boat = "Boat"
 
-  var state = PlayingState
+  // Some Places
 
-  override def draw(): Unit = {
-    state match {
-      case PlayingState => drawPlaying()
-      case InventoryState => drawInventory()
-      case CharacterState => drawCharacter()
+  case object Shire extends Place {
+    things = things + Ring
+
+
+    def describe(): Unit = {
+      println("You are in the shire.")
+    }
+
+    def actions: Actions = {
+      case "go" :: "out" :: Nil =>
+        place = Bree
     }
   }
 
-  def drawPlaying(): Unit = {
-    if (xp >= 50) {
-      level = level + 1
-      if (level >= 2) {
-        strength = strength + 1
+  case object Bree extends Place {
+    def describe(): Unit = {
+      println("You come to bree, a town of Humans and Hobbits. there a barman, named Butterbur gives you a letter. You also meet a human named Strider who will help you later")
+    }
+
+    def actions: Actions = {
+      case "Read" :: "letter" :: Nil =>
+        println("meet me at the house of elrond(east)." +
+          " yours, gandalf")
+
+
+
+
+      case "go" :: "west" :: Nil =>
+        place = Shire
+
+      case "go" :: "east" :: Nil =>
+        place = weathertop
+
+    }
+  }
+
+  case object GreatNorthRoad extends Place {
+    def describe(): Unit = {
+      println("You are on a great dark road going north-south.")
+    }
+
+    def actions: Actions = {
+      case "go" :: "north" :: Nil =>
+
+      case "go" :: "south" :: Nil =>
+        place = Bree
+    }
+  }
+
+  case object weathertop extends Place {
+    things = things + Banana
+
+    var happy: Boolean = false
+
+    def describe(): Unit = {
+      println("You are on a big lane that runs east.")
+      println("There is a great big dog in the lane.")
+      if (happy) {
+        println("The dog is pleased to see you.")
       }
-      if (level >= 2) {
-        strength = strength + 1
-        speed = speed + 1
-        will = will + 1
-      }
-      xp = 0
     }
 
-    background(0, 100, 100)
+    def actions: Actions = {
+      case "go" :: "west" :: Nil =>
+        place = Bree
 
-    character.move(this)
-
-    weapons = weapons.filter(weapon => weapon.age <= MaxAge)
-
-    enemies = enemies.filter(enemy => enemy.dead == false)
-
-    enemies foreach { enemy =>
-      enemy.move()
-      enemy.draw(this)
-    }
-
-    enemies foreach { enemy =>
-      weapons foreach { weapon =>
-        if (weapon.hit(enemy)) {
-          enemy.dead = true
-          xp = xp + 5
+      case "go" :: "east" :: Nil =>
+        if (happy) {
+          place = NearEast
+        } else {
+          println("The dog growls angrily and you run away home.")
+          place = Shire
         }
 
-      }
+      case "pet" :: "dog" :: Nil =>
+        println("The dog wags his tail.")
+        happy = true
+
+      case "kick" :: "dog" :: Nil =>
+        println("The dog eats you.")
+        going = false
+    }
+  }
+
+  case object NearEast extends Place {
+    def describe(): Unit = {
+      println("You are on a little lane that runs east.")
+      println("There is a great big Spider in the lane.")
+
     }
 
-    walls foreach { wall =>
+    def actions: Actions = {
+      case "go" :: "west" :: Nil =>
+        place = weathertop
 
-      if (character.bounce(wall)) {
-        character.x = character.x
-        character.y = character.y
-      }
-    }
-    walls foreach { wall =>
-      enemies foreach { enemy =>
-
-        if (enemy.bounce2(wall)) {
-          enemy.dx = -enemy.dx
-          enemy.dy = -enemy.dy
+      case "go" :: "east" :: Nil =>
+        if (inventory.contains(Ring)) {
+          place = EndOfTheRoad
+        } else {
+          println("The cat eats you.")
+          going = false
         }
+
+      case "pet" :: "cat" :: Nil =>
+        println("The cat eats you.")
+        going = false
+    }
+  }
+
+  case object EndOfTheRoad extends Place {
+    def describe(): Unit = {
+      things = things + Boat
+      println("You have reached a river.")
+
+    }
+
+    def actions: Actions = {
+      case "C" :: "C" :: Nil =>
+        place = Island
+
+      case "go" :: "home" :: Nil =>
+        place = Shire
+    }
+  }
+
+  case object Island extends Place {
+    def describe(): Unit = {
+      println("The boat takes you to an island. You won.")
+      going = false
+    }
+    def actions: Actions = {
+
+      case "go" :: "home" :: Nil =>
+        place = Shire
+    }
+  }
+
+
+  // Some Functions
+
+  def lookAround(): Unit = {
+    place.describe()
+    if (place.things.nonEmpty) {
+      val things = place.things.mkString(", ")
+      println(s"Things you see here: $things")
+    }
+  }
+
+  def printInventory(): Unit = {
+    if (inventory.nonEmpty) {
+      val things = inventory.mkString(", ")
+      println(s"Things you have: $things")
+    } else {
+      println("You have nothing.")
+    }
+  }
+
+  def take(thing: String): Unit = {
+    if (place.things.contains(thing)) {
+      place.things = place.things - thing
+      inventory = inventory + thing
+      printInventory()
+    } else {
+      println(s"There is no $thing here.")
+    }
+  }
+
+
+  def drop(thing: String): Unit = {
+    if (inventory.contains(thing)) {
+      inventory = inventory - thing
+      place.things = place.things + thing
+      printInventory()
+    } else {
+      println(s"You do not have a $thing.")
+    }
+  }
+
+  def eat(thing: String): Unit = {
+    if (inventory.contains(thing)) {
+      inventory = inventory - thing
+      if (thing == Banana) {
+        println("Not bad.")
+      } else {
+        println("You do not feel very well.")
       }
-    }
-    walls foreach { wall =>
-      weapons foreach { weapon =>
-
-        if (weapon.bounce3(wall)) {
-          weapon.dx = -weapon.dx
-          weapon.dy = -weapon.dy
-        }
-      }
-    }
-
-    if (System.currentTimeMillis() >= dronetime) {
-      val enemy = Enemy(Math.random * 1000.0, Math.random * 1000.0, Math.random * 1, Math.random * 1, 100)
-      enemies = enemies :+ enemy
-      dronetime = dronetime + 500 + Random.nextInt(800)
-    }
-
-
-    weapons foreach { weapon =>
-      weapon.move()
-      weapon.draw(this)
-    }
-
-
-    character.draw(this)
-
-
-    walls foreach { wall =>
-      wall.draw(this)
-    }
-
-    if (lives == 0) {
-      System.exit(0)
+    } else {
+      println(s"You do not have a $thing.")
     }
   }
 
-  var inventory = List(
-    "The universe"
-  )
+  def defaultActions: Actions = {
 
-  def drawInventory(): Unit = {
-    background(50, 50, 50)
-    inventory foreach { item =>
-      text(item, 500, 500)
-    }
+    case "inventory" :: Nil =>
+      printInventory()
+
+    case "look" :: Nil =>
+      lookAround()
+
+    case "take" :: thing :: Nil =>
+      take(thing)
+
+    case "drop" :: thing :: Nil =>
+      drop(thing)
+
+    case "eat" :: thing :: Nil =>
+      eat(thing)
+
+    case "go" :: where :: Nil =>
+      println(s"You cannot go $where.")
+
+    case "what" :: Nil =>
+      println("You can: inventory (see inventory), look (see place), take _____(pick something up), drop ______(put something down), eat ________(eat something), go ______(go somewhere), quit(quit), other things")
+
+    case "quit" :: Nil =>
+      println("Bye.")
+      going = false
+
+    case "win" :: Nil =>
+      println("You won!??!?!??!?!??!?!??!")
+      going = false
+
+    case _ =>
+      println("I do not know how to do that.")
   }
 
-  var characterSheet = List(
-
-  )
-
-  def drawCharacter(): Unit = {
-    background(255, 255, 255)
-    //text(name + " The Wizard That Is Level " + level, 10, 10)
-    text("xp: " + xp, 10, 50)
-    text("speed: " + speed, 10, 150)
-    text("will: " + will, 10, 200)
-
-
+  def perform(action: List[String]): Unit = {
+    val actions = place.actions.orElse(defaultActions)
+    actions(action)
   }
 
-  val Left = 37
-  val Right = 39
-  val Up = 38
-  val Down = 40
+  // The main program
 
-  override def keyPressed(event: KeyEvent): Unit = {
-    if (event.getKeyCode == Right) {
-      character.x = character.x+(10*speed)
-      character.dy = 0
-      character.angle = -Math.PI / 2
-    } else if (event.getKeyCode == Left) {
-      character.x = character.x-(10*speed)
-      character.dy = 0
-      character.angle = -Math.PI / 2
-    } else if (event.getKeyCode == Down) {
-      character.y = character.y+(10*speed)
-      character.dx = 0
-      character.angle = -Math.PI / 2
-    } else if (event.getKeyCode == Up) {
-      character.dx = 0
-      character.y = character.y-(10*speed)
-      character.angle = -Math.PI / 2
-    } else if (event.getKey == 'i') {
-      state = InventoryState
-
-    } else if (event.getKey == 'g') {
-      state = PlayingState
-    } else if (event.getKey == 'c') {
-      state = CharacterState
-    } else if (event.getKeyCode == 32) {
-      if (character.angle == floater(Math.PI)) {
-
-        weapons = weapons :+ Weapon(character.x, character.y, character.dx - 10, character.dy, 10)
-      } else if (character.angle == 0) {
-        weapons = weapons :+ Weapon(character.x, character.y, character.dx + 10, character.dy, 10)
-      }
-      else if (character.angle == floater(-Math.PI / 2)) {
-        weapons = weapons :+ Weapon(character.x, character.y, character.dx, character.dy - 10, 10)
-      }
-      else if (character.angle == floater(-Math.PI * 3 / 2)) {
-        weapons = weapons :+ Weapon(character.x, character.y, character.dx, character.dy + 10, 10)
-      } else {}
-    }else if(event.getKey == 'w'){
-      weapons = weapons :+ Weapon(character.x, character.y, 0, (15*will), 10)
-    }else if(event.getKey == 'a'){
-      weapons = weapons :+ Weapon(character.x, character.y, (15*will),0 , 10)
-    }else if(event.getKey == 's'){
-      weapons = weapons :+ Weapon(character.x, character.y, 0, -(15*will), 10)
-    }else if(event.getKey == 'd'){
-      weapons = weapons :+ Weapon(character.x, character.y, -(15*will),0 , 10)
-    }
-
-
-    if (character.x + character.rad >= width) {
-      character.x = width - character.rad - 1
-
-    } else if (character.x - character.rad < 0) {
-      character.x = character.rad
-    } else if (character.y + character.rad >= height) {
-      character.y = height - character.rad - 1
-    } else if (character.y - character.rad < 0) {
-      character.y = character.rad
-    }
-
-
+  while (going) {
+    lookAround()
+    val action = StdIn.readLine("What now? ")
+    val words = action.split(" ").toList
+    perform(words)
   }
-
-
-  override def keyReleased(event: KeyEvent): Unit = {
-  }
-
 
 }
 
-object RPG1 extends App {
-  var class2 = 0
-  //println("Welcome to WizardRPG1 By E. Hughes")
-  //println("enter Name:")
-  //var name = StdIn.readLine()
-  //println("hello " + name)
-
-  //println("hello " + name + " the " +  "Wizard !")
-
-  PApplet.main("RPG1")
-
-  var targetShape: PImage = _
-  var characterShape: PImage = _
-
-  case class Character(
-                        var x: Float,
-                        var y: Float,
-                        var dx: Float,
-                        var dy: Float,
-                        var angle: Float,
-                        rad: Float
-                      ) {
-
-    def move(p: PApplet): Unit = {
-      if (y + dy >= p.height - rad) {
-        dy = -dy
-      } else if (y + dy <= rad) {
-        dy = -dy
-      }
-
-      if (x + dx >= p.width - rad) {
-        dx = -dx
-      } else if (x + dx <= rad) {
-        dx = -dx
-      }
-
-      x = x + dx
-      y = y + dy
 
 
-    }
-
-    def draw(p: PApplet): Unit = {
-      import p._
-
-      pushMatrix()
-      translate(x, y)
-      rotate(angle + floater(Math.PI / 2))
-      image(characterShape, -rad, -rad, rad * 2, rad * 2)
-      popMatrix()
-    }
-
-    def bounce(wall: Wall): Boolean = {
-      var wx = wall.x
-      var wy = wall.y
-      var wallxl = wall.xl
-
-
-      var wallyl = wall.yl
-      (x >= wx - rad && x <= wx + wallxl + rad && y >= wy - rad && y < wy + wallyl + rad) ||
-        (y >= wy - rad && y <= wy + wallyl + rad && x >= wx - rad && x < wx + wallxl + rad)
-
-    }
-  }
-
-
-  case class Wall(
-                   var x: Float,
-                   var y: Float,
-                   var xl: Float,
-                   var yl: Float
-
-                 ) {
-
-
-    def draw(p: PApplet): Unit = {
-      import p._
-      fill(0, 1, 1)
-      rect(x, y, xl, yl)
-
-    }
-
-
-  }
-
-  case class Escape(
-                     var x: Float,
-                     var y: Float,
-                     var xl: Float,
-                     var yl: Float
-
-                   ) {
-
-
-    def draw(p: PApplet): Unit = {
-      import p._
-      fill(0, 0, 255)
-      rect(100, 100, 50, 50)
-
-    }
-
-
-  }
-
-  case class Enemy(
-                    var x: Float,
-                    var y: Float,
-                    var dx: Float,
-                    var dy: Float,
-                    var rad: Float
-                  ) {
-    var dead = false
-
-    def move(): Unit = {
-      x = x + dx
-      y = y + dy
-    }
-
-    def draw(p: PApplet): Unit = {
-      import p._
-      fill(0, 1, 1)
-      image(targetShape, x, y, 300, 300)
-
-    }
-
-    def bounce2(wall: Wall): Boolean = {
-      var wx = wall.x
-      var wy = wall.y
-      var wallxl = wall.xl
-      var wallyl = wall.yl
-      (x >= wx - rad && x <= wx + wallxl + rad && y >= wy - rad && y < wy + wallyl + rad) ||
-        (y >= wy - rad && y <= wy + wallyl + rad && x >= wx - rad && x < wx + wallxl + rad)
-    }
-
-
-  }
-
-  case class Weapon(
-                     var x: Float,
-                     var y: Float,
-                     var dx: Float,
-                     var dy: Float,
-                     var age: Int
-                   ) {
-    def move(): Unit = {
-      x = x + -dx
-      y = y + -dy
-      age = age + 1
-    }
-
-    def draw(p: PApplet): Unit = {
-      import p._
-      fill(0, 0, 255)
-      ellipse(x, y, 5.0, 5.0)
-    }
-
-    def kill(): Unit = {
-      age = MAX_INT
-    }
-
-    def hit(enemy: Enemy): Boolean = {
-      var dx = enemy.x
-      var dy = enemy.y
-      var bx = x
-      var by = y
-      var br = 2
-      var dr = enemy.rad
-      var a = dx - bx
-      var o = dy - by
-      var h = Math.sqrt(a * a + o * o)
-
-      def bounce3(wall: Wall): Boolean = {
-        var wx = wall.x
-        var wy = wall.y
-        var wallxl = wall.xl
-        var wallyl = wall.yl
-        (x >= wx - 2.5 && x <= wx + wallxl + 2.5 && y >= wy - 2.5 && y < wy + wallyl + 2.5) ||
-          (y >= wy - 2.5 && y <= wy + wallyl + 2.5 && x >= wx - 2.5 && x < wx + wallxl + 2.5)
-      }
-
-      h <= dr + br
-
-
-    }
-
-    def bounce3(wall: Wall): Boolean = {
-      var wx = wall.x
-      var wy = wall.y
-      var wallxl = wall.xl
-      var wallyl = wall.yl
-      (x >= wx - 2.5 && x <= wx + wallxl + 2.5 && y >= wy - 2.5 && y < wy + wallyl + 2.5) ||
-        (y >= wy - 2.5 && y <= wy + wallyl + 2.5 && x >= wx - 2.5 && x < wx + wallxl + 2.5)
-    }
-  }
-
-  implicit def floater(v: Double): Float = v.toFloat
-}
